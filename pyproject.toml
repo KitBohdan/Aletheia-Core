@@ -33,7 +33,7 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-q --cov=vct --cov-report=term-missing --cov-report=xml"
+addopts = "-q"
 testpaths = ["tests"]
 
 [tool.coverage.run]
