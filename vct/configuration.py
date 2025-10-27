@@ -45,7 +45,7 @@ class RoboDogSettings(BaseModel):
                 cleaned = key.strip("'\"")
                 if not cleaned:
                     raise ValueError("Command map keys must be non-empty strings")
-                normalized[cleaned.lower()] = str(v).strip().upper() or "NONE"
+                normalized[cleaned.casefold()] = str(v).strip().upper() or "NONE"
             return normalized
         raise TypeError("commands_map must be a mapping of phrase to action")
 
