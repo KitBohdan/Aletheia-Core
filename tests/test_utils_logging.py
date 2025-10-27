@@ -82,6 +82,25 @@ def test_structured_output_is_valid_json(caplog: pytest.LogCaptureFixture) -> No
     assert parsed["extra"]["user"] == "alice"
 
 
+def test_structured_formatter_handles_non_json_serializable_extra(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class NonSerializable:
+        def __str__(self) -> str:  # pragma: no cover - trivial
+            return "<NonSerializable>"
+
+    logger = get_logger("vct.test.non_serializable")
+
+    with caplog.at_level(logging.INFO):
+        logger.info("with extra", extra={"request": NonSerializable()})
+
+    assert caplog.records
+    formatter = StructuredJsonFormatter()
+    rendered = formatter.format(caplog.records[0])
+    parsed = json.loads(rendered)
+    assert parsed["extra"]["request"] == "<NonSerializable>"
+
+
 def test_get_correlation_id_defaults_to_none() -> None:
     set_correlation_id(None)
     assert get_correlation_id() is None

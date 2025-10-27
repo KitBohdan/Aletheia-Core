@@ -99,7 +99,7 @@ class StructuredJsonFormatter(logging.Formatter):
         if extra:
             payload["extra"] = extra
 
-        return json.dumps(payload, ensure_ascii=False)
+        return json.dumps(payload, ensure_ascii=False, default=str)
 
 
 def _rotating_file_handler() -> RotatingFileHandler:
