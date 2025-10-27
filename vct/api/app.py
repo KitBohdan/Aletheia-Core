@@ -2,9 +2,10 @@ import os
 from time import perf_counter
 from typing import Any
 
-from fastapi import FastAPI, Request
-from fastapi.responses import Response
-from pydantic import BaseModel
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, Field, constr
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -15,11 +16,14 @@ from ..utils.metrics import (
     record_api_request,
     record_command,
 )
+from .security import APIKeyAuthError, require_api_key
 
 log = get_logger("API")
 CFG = os.getenv("VCT_CONFIG", "vct/config.yaml")
 SIM = os.getenv("VCT_SIMULATE", "1") == "1"
 GPIO_PIN = int(os.getenv("VCT_GPIO_PIN", "0")) or None
+_https_env = os.getenv("VCT_REQUIRE_HTTPS", "0")
+REQUIRE_HTTPS = _https_env == "1"
 brain = RoboDogBrain(cfg_path=CFG, gpio_pin=GPIO_PIN, simulate=SIM)
 
 ACT_ENDPOINT = "/robot/act"
@@ -48,6 +52,24 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(MetricsMiddleware)
+if REQUIRE_HTTPS:
+    app.add_middleware(HTTPSRedirectMiddleware)
+
+
+@app.exception_handler(APIKeyAuthError)
+async def api_key_auth_exception_handler(_: Request, exc: APIKeyAuthError) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers
+        )
+
+    log.exception("Unhandled exception in API request")
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/health")
@@ -56,20 +78,20 @@ def health() -> dict[str, bool | str]:
 
 
 class ActIn(BaseModel):
-    text: str
-    confidence: float = 0.85
-    reward_bias: float = 0.5
-    mood: float = 0.0
+    text: constr(min_length=1, strip_whitespace=True)  # type: ignore[valid-type]
+    confidence: float = Field(0.85, ge=0.0, le=1.0)
+    reward_bias: float = Field(0.5, ge=0.0, le=1.0)
+    mood: float = Field(0.0, ge=-1.0, le=1.0)
 
 
 @app.post("/robot/act")
-def act(inp: ActIn) -> dict[str, Any]:
+def act(inp: ActIn, _: str = Depends(require_api_key)) -> dict[str, Any]:
     record_command("api")
     out = brain.handle_command(inp.text, inp.confidence, inp.reward_bias, inp.mood)
     return {"ok": True, "result": out}
 
 
 @app.get("/metrics")
-def metrics() -> Response:
+def metrics(_: str = Depends(require_api_key)) -> Response:
     payload = generate_latest()
     return Response(content=payload, media_type=CONTENT_TYPE_LATEST)
