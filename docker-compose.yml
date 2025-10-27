@@ -1,0 +1,6 @@
+services:
+  vct:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      - VCT_SIMULATE=1

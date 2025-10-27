@@ -1,0 +1,1 @@
+- No reward for barking by default; cooldown limits; session caps.

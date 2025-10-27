@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vct"
+version = "0.14.0"
+description = "Voice Canine Trainer + RoboDog Brain (LLM-first control, reward GPIO, ethics guard)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "Ярослав / DexterX"}]
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn>=0.30.0",
+  "pydantic>=2.8.2",
+  "pyttsx3>=2.90",
+  "paho-mqtt>=2.1.0",
+  "prometheus-client>=0.20.0"
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+select = ["E","F","I","UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-q --cov=vct --cov-report=term-missing --cov-report=xml"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["vct"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
