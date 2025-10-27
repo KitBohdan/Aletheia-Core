@@ -3,8 +3,46 @@ reward_cooldown_s: 3
 weights: {stimulus: 0.40, confidence: 0.30, reward_bias: 0.20, mood: 0.10}
 commands_map:
   сидіти: SIT
+  сісти: SIT
+  сідай: SIT
+  "сідай негайно": SIT
+  "sit": SIT
+  "sit down": SIT
   лежати: LIE_DOWN
+  лягти: LIE_DOWN
+  лягай: LIE_DOWN
+  "лежати спокійно": LIE_DOWN
+  "lie down": LIE_DOWN
+  "down": LIE_DOWN
   до_мене: COME
+  "до мене": COME
+  "сюди": COME
+  "йди сюди": COME
+  "come": COME
+  "come here": COME
   голос: BARK
-reward_triggers: {SIT: true, LIE_DOWN: true, COME: true, BARK: false}
+  "дай голос": BARK
+  гавкати: BARK
+  "bark": BARK
+  "speak": BARK
+  "стій": STAY
+  "залишайся": STAY
+  "не руш": STAY
+  "stay": STAY
+  "wait": STAY
+  "поруч": HEEL
+  "до ноги": HEEL
+  "йди поруч": HEEL
+  "heel": HEEL
+  "фу": LEAVE_IT
+  "залиш": LEAVE_IT
+  "відпусти": LEAVE_IT
+  "leave it": LEAVE_IT
+  "drop it": LEAVE_IT
+  "апорт": FETCH
+  "принеси": FETCH
+  "принеси м'яч": FETCH
+  "fetch": FETCH
+  "bring it": FETCH
+reward_triggers: {SIT: true, LIE_DOWN: true, COME: true, BARK: false, STAY: true, HEEL: true, LEAVE_IT: true, FETCH: true}
 mood_initial: CALM

@@ -3,6 +3,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
+import re
+
 from ..behavior.policy import BehaviorInputs, BehaviorPolicy
 from ..configuration import RoboDogSettings
 from ..engines.stt import RuleBasedSTT, STTEngineBase, WhisperSTT
@@ -17,6 +19,15 @@ log = get_logger("RoboDogBrain")
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, value))
+
+
+_NORMALIZE_PATTERN = re.compile(r"[\s_\-]+")
+
+
+def _normalize_phrase(value: str) -> str:
+    """Produce a comparison-friendly token from a spoken command."""
+
+    return _NORMALIZE_PATTERN.sub("", value.casefold())
 
 
 class RoboDogBrain:
@@ -49,10 +60,10 @@ class RoboDogBrain:
 
     def _action_from_text(self, text: str) -> str:
         m = self.settings.commands_map
-        n = text.strip().lower().replace(" ", "")
-        for k, v in m.items():
-            if k.replace(" ", "") in n:
-                return v
+        normalized_input = _normalize_phrase(text)
+        for phrase, action in m.items():
+            if _normalize_phrase(phrase) in normalized_input:
+                return action
         return "NONE"
 
     def _maybe_reward(self, action: str, score: float) -> bool:
