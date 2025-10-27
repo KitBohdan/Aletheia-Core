@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 from .configuration import RoboDogSettings, apply_key_path, parse_typed_value
 from .robodog.dog_bot_brain import RoboDogBrain
+from .utils.metrics import record_command
 
 
 def _add_common_run_arguments(parser: argparse.ArgumentParser) -> None:
@@ -19,8 +20,10 @@ def _add_common_run_arguments(parser: argparse.ArgumentParser) -> None:
 def _handle_run_command(args: argparse.Namespace) -> None:
     brain = RoboDogBrain(cfg_path=args.config, gpio_pin=args.gpio_pin, simulate=args.simulate)
     if args.wav:
+        record_command("cli")
         res = brain.run_once_from_wav(args.wav)
     else:
+        record_command("cli")
         res = brain.handle_command(args.cmd or "сидіти")
     print(json.dumps(res, ensure_ascii=False, indent=2))
 
