@@ -7,7 +7,7 @@ name = "vct"
 version = "0.14.0"
 description = "Voice Canine Trainer + RoboDog Brain (LLM-first control, reward GPIO, ethics guard)"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [{name = "Ярослав / DexterX"}]
 dependencies = [
@@ -28,8 +28,13 @@ stt = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
-select = ["E","F","I","UP"]
+target-version = "py310"
+extend-exclude = [
+  "httpx",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]
@@ -44,3 +49,21 @@ source = ["vct"]
 [tool.coverage.report]
 fail_under = 80
 show_missing = true
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+extend-exclude = "/httpx/"
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_configs = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+strict_optional = true
+no_implicit_optional = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+show_error_codes = true
+pretty = true

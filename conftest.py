@@ -1,8 +1,8 @@
 """Project-wide pytest configuration tweaks."""
+
 from __future__ import annotations
 
 import importlib
-from typing import List
 
 
 def _pytest_cov_is_available() -> bool:
@@ -18,9 +18,7 @@ def _pytest_cov_is_available() -> bool:
     return True
 
 
-def pytest_load_initial_conftests(
-    early_config: object, parser: object, args: List[str]
-) -> None:
+def pytest_load_initial_conftests(early_config: object, parser: object, args: list[str]) -> None:
     """Strip coverage related CLI flags when ``pytest-cov`` is unavailable.
 
     The project requests coverage collection via ``pyproject.toml``'s ``addopts``.  The

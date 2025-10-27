@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 import time
-from typing import Dict, Optional
+from typing import Any
 
 from ..behavior.policy import BehaviorInputs, BehaviorPolicy
-from ..engines.stt import RuleBasedSTT, WhisperSTT
-from ..engines.tts import OpenAITTS, Pyttsx3TTS, PrintTTS
-from ..ethics.guard import EthicsGuard
-from ..hardware.gpio_reward import GPIOActuator, SimulatedActuator
 from ..configuration import RoboDogSettings
+from ..engines.stt import RuleBasedSTT, STTEngineBase, WhisperSTT
+from ..engines.tts import OpenAITTS, PrintTTS, Pyttsx3TTS, TTSEngineBase
+from ..ethics.guard import EthicsGuard
+from ..hardware.gpio_reward import GPIOActuator, RewardActuatorBase, SimulatedActuator
 from ..utils.logging import get_logger
 
 log = get_logger("RoboDogBrain")
@@ -17,26 +19,30 @@ def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
 
 
 class RoboDogBrain:
-    def __init__(self, cfg_path: str, gpio_pin: Optional[int] = None, simulate: bool = False):
+    def __init__(self, cfg_path: str, gpio_pin: int | None = None, simulate: bool = False):
         self.settings = RoboDogSettings.load(cfg_path)
         self.cfg = self.settings.model_dump()
         try:
-            self.stt = WhisperSTT()
+            self.stt: STTEngineBase = WhisperSTT()
         except RuntimeError as exc:
             log.warning("Whisper STT unavailable (%s), falling back to rule-based engine", exc)
             self.stt = RuleBasedSTT()
         if simulate:
-            self.tts = PrintTTS()
+            self.tts: TTSEngineBase = PrintTTS()
         elif OpenAITTS.is_configured():
             self.tts = OpenAITTS()
         else:
             self.tts = Pyttsx3TTS()
         self.policy = BehaviorPolicy(self.settings.policy_config)
-        self.environment_context: Dict[str, float] = self.settings.environment_context
-        self.reward_map: Dict[str, bool] = self.settings.reward_triggers
+        self.environment_context: dict[str, float] = self.settings.environment_context
+        self.reward_map: dict[str, bool] = self.settings.reward_triggers
         self.cooldown_s = float(self.settings.reward_cooldown_s)
         self.simulate = simulate
-        self.actuator = SimulatedActuator() if (simulate or gpio_pin is None) else GPIOActuator(gpio_pin)
+        self.actuator: RewardActuatorBase
+        if simulate or gpio_pin is None:
+            self.actuator = SimulatedActuator()
+        else:
+            self.actuator = GPIOActuator(gpio_pin)
         self.guard = EthicsGuard()
         self._last_reward_ts = 0.0
 
@@ -65,8 +71,8 @@ class RoboDogBrain:
         confidence: float = 0.85,
         reward_bias: float = 0.5,
         mood: float = 0.0,
-        fatigue: Optional[float] = None,
-    ) -> Dict:
+        fatigue: float | None = None,
+    ) -> dict[str, Any]:
         action = self._action_from_text(text)
         now = time.time()
         time_since_reward = now - self._last_reward_ts if self._last_reward_ts else self.cooldown_s
@@ -89,12 +95,14 @@ class RoboDogBrain:
         )
         vec = self.policy.decide(action, inputs)
         rewarded = self._maybe_reward(vec.action, vec.score)
-        feedback = f"Дія: {vec.action} score={vec.score:.2f}" + (" — ✅ винагорода" if rewarded else "")
+        feedback = f"Дія: {vec.action} score={vec.score:.2f}" + (
+            " — ✅ винагорода" if rewarded else ""
+        )
         self.tts.speak(feedback)
         log.info(feedback)
         return {"action": vec.action, "score": vec.score, "rewarded": rewarded}
 
-    def run_once_from_wav(self, wav_path: str) -> Dict:
+    def run_once_from_wav(self, wav_path: str) -> dict[str, Any]:
         try:
             text = self.stt.transcribe(wav_path=wav_path)
         except RuntimeError as exc:

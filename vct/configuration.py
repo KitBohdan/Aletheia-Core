@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping, MutableMapping, Tuple
-
 import json
+from collections.abc import Iterable, Mapping, MutableMapping
+from pathlib import Path
+from typing import Any
+
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError, field_validator
 
 
 class RoboDogSettings(BaseModel):
@@ -14,17 +15,17 @@ class RoboDogSettings(BaseModel):
 
     latency_budget_ms: int = Field(300, ge=0)
     reward_cooldown_s: float = Field(3.0, ge=0.0)
-    weights: Dict[str, float] = Field(default_factory=dict)
-    behavior_policy: Dict[str, Any] | None = None
-    policy: Dict[str, Any] | None = None
-    commands_map: Dict[str, str] = Field(default_factory=dict)
-    reward_triggers: Dict[str, bool] = Field(default_factory=dict)
-    environment_context: Dict[str, float] = Field(default_factory=dict)
+    weights: dict[str, float] = Field(default_factory=dict)
+    behavior_policy: dict[str, Any] | None = None
+    policy: dict[str, Any] | None = None
+    commands_map: dict[str, str] = Field(default_factory=dict)
+    reward_triggers: dict[str, bool] = Field(default_factory=dict)
+    environment_context: dict[str, float] = Field(default_factory=dict)
     mood_initial: str | None = None
 
     @field_validator("weights", mode="before")
     @classmethod
-    def _ensure_float_mapping(cls, value: Any) -> Dict[str, float]:
+    def _ensure_float_mapping(cls, value: Any) -> dict[str, float]:
         if value is None:
             return {}
         if isinstance(value, Mapping):
@@ -33,7 +34,7 @@ class RoboDogSettings(BaseModel):
 
     @field_validator("commands_map", mode="before")
     @classmethod
-    def _normalize_commands(cls, value: Any) -> Dict[str, str]:
+    def _normalize_commands(cls, value: Any) -> dict[str, str]:
         if value is None:
             return {}
         if isinstance(value, dict):
@@ -50,7 +51,7 @@ class RoboDogSettings(BaseModel):
 
     @field_validator("reward_triggers", mode="before")
     @classmethod
-    def _normalize_triggers(cls, value: Any) -> Dict[str, bool]:
+    def _normalize_triggers(cls, value: Any) -> dict[str, bool]:
         if value is None:
             return {}
         if isinstance(value, dict):
@@ -59,7 +60,7 @@ class RoboDogSettings(BaseModel):
 
     @field_validator("environment_context", mode="before")
     @classmethod
-    def _normalize_context(cls, value: Any) -> Dict[str, float]:
+    def _normalize_context(cls, value: Any) -> dict[str, float]:
         if value is None:
             return {}
         if isinstance(value, dict):
@@ -67,7 +68,7 @@ class RoboDogSettings(BaseModel):
         raise TypeError("environment_context must be a mapping of context values")
 
     @property
-    def policy_config(self) -> Dict[str, Any]:
+    def policy_config(self) -> dict[str, Any]:
         """Return the configuration dictionary for the behavior policy."""
 
         if self.behavior_policy is not None:
@@ -79,7 +80,7 @@ class RoboDogSettings(BaseModel):
         return {}
 
     @classmethod
-    def load(cls, path: str | Path) -> "RoboDogSettings":
+    def load(cls, path: str | Path) -> RoboDogSettings:
         payload = _read_config(path)
         try:
             return cls.model_validate(payload)
@@ -89,13 +90,13 @@ class RoboDogSettings(BaseModel):
     def save(self, path: str | Path) -> None:
         _write_config(path, self.model_dump(mode="json"))
 
-    def updated(self, updates: Dict[str, Any]) -> "RoboDogSettings":
+    def updated(self, updates: dict[str, Any]) -> RoboDogSettings:
         data = self.model_dump()
         data.update(updates)
         return type(self).model_validate(data)
 
 
-def _read_config(path: str | Path) -> Dict[str, Any]:
+def _read_config(path: str | Path) -> dict[str, Any]:
     path_obj = Path(path)
     if not path_obj.exists():
         raise FileNotFoundError(f"Configuration file not found: {path_obj}")
@@ -112,7 +113,7 @@ def _read_config(path: str | Path) -> Dict[str, Any]:
     raise ValueError(f"Unsupported configuration format: {suffix}")
 
 
-def _write_config(path: str | Path, payload: Dict[str, Any]) -> None:
+def _write_config(path: str | Path, payload: dict[str, Any]) -> None:
     path_obj = Path(path)
     suffix = path_obj.suffix.lower()
     if suffix in {".yaml", ".yml", ""}:
@@ -138,9 +139,9 @@ def apply_key_path(
     key_path: Iterable[str],
     value: Any,
 ) -> RoboDogSettings:
-    data: Dict[str, Any] = settings.model_dump(mode="json")
+    data: dict[str, Any] = settings.model_dump(mode="json")
     target: MutableMapping[str, Any] = data
-    segments: Tuple[str, ...] = tuple(key_path)
+    segments: tuple[str, ...] = tuple(key_path)
     if not segments:
         raise ValueError("Key path cannot be empty")
     for part in segments[:-1]:
@@ -171,4 +172,3 @@ def parse_typed_value(raw: str, value_type: str) -> Any:
     if value_type == "json":
         return json.loads(raw)
     raise ValueError(f"Unsupported value type: {value_type}")
-

@@ -1,9 +1,20 @@
-import logging, sys
+"""Utility helpers for consistent logging configuration."""
+
+import logging
+import sys
+from typing import Final
+
+_DEFAULT_FORMAT: Final[str] = "[%(asctime)s] %(levelname)s %(name)s: %(message)s"
+
+
 def get_logger(name: str) -> logging.Logger:
+    """Return a logger configured with a standard stream handler."""
+
     logger = logging.getLogger(name)
     if not logger.handlers:
-        h = logging.StreamHandler(sys.stdout)
-        fmt = logging.Formatter("[%(asctime)s] %(levelname)s %(name)s: %(message)s")
-        h.setFormatter(fmt)
-        logger.addHandler(h); logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter(_DEFAULT_FORMAT)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
     return logger

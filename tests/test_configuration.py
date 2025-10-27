@@ -21,7 +21,7 @@ reward_triggers:
   sit: true
 weights:
   confidence: 0.9
-        """.strip()
+        """.strip(),
     )
     settings = RoboDogSettings.load(cfg_path)
     assert settings.reward_cooldown_s == 1.5
@@ -50,8 +50,6 @@ def test_parse_typed_value() -> None:
     assert parse_typed_value("true", "bool") is True
     assert parse_typed_value("3.14", "float") == pytest.approx(3.14)
     assert parse_typed_value("42", "int") == 42
-    assert parse_typed_value("{\"a\": 1}", "json") == {"a": 1}
+    assert parse_typed_value('{"a": 1}', "json") == {"a": 1}
     with pytest.raises(ValueError):
         parse_typed_value("maybe", "bool")
-
-
