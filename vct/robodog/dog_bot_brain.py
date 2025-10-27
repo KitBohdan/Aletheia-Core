@@ -1,10 +1,13 @@
-import time, yaml
-from typing import Optional, Dict
-from ..engines.stt import RuleBasedSTT
+import time
+from typing import Dict, Optional
+
+import yaml
+
+from ..behavior.policy import BehaviorInputs, BehaviorPolicy
+from ..engines.stt import RuleBasedSTT, WhisperSTT
 from ..engines.tts import Pyttsx3TTS, PrintTTS
-from ..hardware.gpio_reward import GPIOActuator, SimulatedActuator
-from ..behavior.policy import BehaviorPolicy, BehaviorInputs
 from ..ethics.guard import EthicsGuard
+from ..hardware.gpio_reward import GPIOActuator, SimulatedActuator
 from ..utils.logging import get_logger
 
 log = get_logger("RoboDogBrain")
@@ -13,7 +16,11 @@ class RoboDogBrain:
     def __init__(self, cfg_path: str, gpio_pin: Optional[int] = None, simulate: bool = False):
         with open(cfg_path, "r", encoding="utf-8") as f:
             self.cfg = yaml.safe_load(f)
-        self.stt = RuleBasedSTT()
+        try:
+            self.stt = WhisperSTT()
+        except RuntimeError as exc:
+            log.warning("Whisper STT unavailable (%s), falling back to rule-based engine", exc)
+            self.stt = RuleBasedSTT()
         self.tts = Pyttsx3TTS() if not simulate else PrintTTS()
         self.policy = BehaviorPolicy(self.cfg.get("weights", {}))
         self.reward_map: Dict[str, bool] = self.cfg.get("reward_triggers", {})

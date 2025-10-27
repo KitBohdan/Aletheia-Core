@@ -19,6 +19,11 @@ dependencies = [
   "prometheus-client>=0.20.0"
 ]
 
+[project.optional-dependencies]
+stt = [
+  "openai-whisper>=20231117"
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py39"
