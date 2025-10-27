@@ -65,11 +65,15 @@ class RoboDogBrain:
         confidence: float = 0.85,
         reward_bias: float = 0.5,
         mood: float = 0.0,
+        fatigue: Optional[float] = None,
     ) -> Dict:
         action = self._action_from_text(text)
         now = time.time()
         time_since_reward = now - self._last_reward_ts if self._last_reward_ts else self.cooldown_s
-        fatigue = _clamp(time_since_reward / max(self.cooldown_s * 2.0, 1.0))
+        if fatigue is None:
+            fatigue_value = _clamp(time_since_reward / max(self.cooldown_s * 2.0, 1.0))
+        else:
+            fatigue_value = _clamp(fatigue)
         stress = _clamp(1.0 - confidence)
         env_complexity = _clamp(float(self.environment_context.get("complexity", 0.5)))
         social_engagement = _clamp(float(self.environment_context.get("social_engagement", 0.5)))
@@ -79,7 +83,7 @@ class RoboDogBrain:
             reward_bias=reward_bias,
             mood=mood,
             stress=stress,
-            fatigue=fatigue,
+            fatigue=fatigue_value,
             environmental_complexity=env_complexity,
             social_engagement=social_engagement,
         )
@@ -91,7 +95,12 @@ class RoboDogBrain:
         return {"action": vec.action, "score": vec.score, "rewarded": rewarded}
 
     def run_once_from_wav(self, wav_path: str) -> Dict:
-        text = self.stt.transcribe(wav_path=wav_path)
+        try:
+            text = self.stt.transcribe(wav_path=wav_path)
+        except RuntimeError as exc:
+            log.warning("STT engine failed (%s); switching to rule-based fallback", exc)
+            self.stt = RuleBasedSTT()
+            text = self.stt.transcribe(wav_path=wav_path)
         if not text:
             self.tts.speak("Команду не розпізнано")
             return {"action": "NONE", "score": 0.0, "rewarded": False}
