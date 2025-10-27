@@ -5,7 +5,7 @@ import yaml
 
 from ..behavior.policy import BehaviorInputs, BehaviorPolicy
 from ..engines.stt import RuleBasedSTT, WhisperSTT
-from ..engines.tts import Pyttsx3TTS, PrintTTS
+from ..engines.tts import OpenAITTS, Pyttsx3TTS, PrintTTS
 from ..ethics.guard import EthicsGuard
 from ..hardware.gpio_reward import GPIOActuator, SimulatedActuator
 from ..utils.logging import get_logger
@@ -21,7 +21,12 @@ class RoboDogBrain:
         except RuntimeError as exc:
             log.warning("Whisper STT unavailable (%s), falling back to rule-based engine", exc)
             self.stt = RuleBasedSTT()
-        self.tts = Pyttsx3TTS() if not simulate else PrintTTS()
+        if simulate:
+            self.tts = PrintTTS()
+        elif OpenAITTS.is_configured():
+            self.tts = OpenAITTS()
+        else:
+            self.tts = Pyttsx3TTS()
         self.policy = BehaviorPolicy(self.cfg.get("weights", {}))
         self.reward_map: Dict[str, bool] = self.cfg.get("reward_triggers", {})
         self.cooldown_s = float(self.cfg.get("reward_cooldown_s", 3))
