@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import math
 import random
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any
 
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
@@ -21,7 +22,7 @@ class BehaviorInputs:
     environmental_complexity: float = 0.0
     social_engagement: float = 0.0
 
-    def as_vector(self) -> List[float]:
+    def as_vector(self) -> list[float]:
         """Return a normalized feature vector ready for the policy network."""
         mood_normalized = _clamp((self.mood + 1.0) / 2.0)
         return [
@@ -36,7 +37,7 @@ class BehaviorInputs:
         ]
 
     @classmethod
-    def feature_names(cls) -> Tuple[str, ...]:
+    def feature_names(cls) -> tuple[str, ...]:
         return (
             "stimulus",
             "confidence",
@@ -55,7 +56,7 @@ class BehaviorVector:
     action: str
 
 
-_DEFAULT_WEIGHT_MAP: Dict[str, float] = {
+_DEFAULT_WEIGHT_MAP: dict[str, float] = {
     "stimulus": 0.4,
     "confidence": 0.3,
     "reward_bias": 0.2,
@@ -73,7 +74,7 @@ class _AdaptiveMLP:
         input_size: int,
         hidden_size: int,
         learning_rate: float,
-        rng: Optional[random.Random] = None,
+        rng: random.Random | None = None,
     ) -> None:
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -88,12 +89,14 @@ class _AdaptiveMLP:
         self.output_weights = [self._rng.uniform(-scale, scale) for _ in range(hidden_size)]
         self.output_bias = 0.0
 
-    def forward(self, features: Sequence[float]) -> Tuple[float, List[float]]:
-        hidden: List[float] = []
+    def forward(self, features: Sequence[float]) -> tuple[float, list[float]]:
+        hidden: list[float] = []
         for neuron_weights, bias in zip(self.hidden_weights, self.hidden_bias):
             activation = sum(w * x for w, x in zip(neuron_weights, features)) + bias
             hidden.append(math.tanh(activation))
-        output_activation = sum(w * h for w, h in zip(self.output_weights, hidden)) + self.output_bias
+        output_activation = (
+            sum(w * h for w, h in zip(self.output_weights, hidden)) + self.output_bias
+        )
         score = 1.0 / (1.0 + math.exp(-output_activation))
         return score, hidden
 
@@ -111,9 +114,9 @@ class _AdaptiveMLP:
         grad_output_bias = d_output
 
         # Hidden layer gradients
-        grad_hidden: List[float] = []
+        grad_hidden: list[float] = []
         for weight, h_val in zip(self.output_weights, hidden):
-            grad_hidden.append((1.0 - h_val ** 2) * weight * d_output)
+            grad_hidden.append((1.0 - h_val**2) * weight * d_output)
 
         # Update output layer
         for i in range(self.hidden_size):
@@ -140,14 +143,14 @@ class _AdaptiveMLP:
         self.output_bias = bias
 
 
-TrainingExample = Tuple[BehaviorInputs, float]
+TrainingExample = tuple[BehaviorInputs, float]
 
 
 class BehaviorPolicy:
-    def __init__(self, config: Optional[Dict] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         config = dict(config or {})
-        legacy_weights: Dict[str, float] = {}
-        if config and all(isinstance(v, (int, float)) for v in config.values()):
+        legacy_weights: dict[str, float] = {}
+        if config and all(isinstance(v, int | float) for v in config.values()):
             legacy_weights = {str(k): float(v) for k, v in config.items()}
             config = {}
         else:
@@ -166,7 +169,7 @@ class BehaviorPolicy:
             rng=self._rng,
         )
         self._trained = False
-        self.training_history: List[float] = []
+        self.training_history: list[float] = []
         if legacy_weights:
             self._warm_start_from_weights(legacy_weights)
         training_data = config.get("training_data", [])
@@ -176,7 +179,7 @@ class BehaviorPolicy:
                 epochs = int(config.get("epochs", 150))
                 self.train(dataset, epochs=epochs)
 
-    def _warm_start_from_weights(self, weight_map: Dict[str, float]) -> None:
+    def _warm_start_from_weights(self, weight_map: dict[str, float]) -> None:
         features = []
         for name in BehaviorInputs.feature_names():
             default = _DEFAULT_WEIGHT_MAP.get(name, 0.0)
@@ -184,7 +187,7 @@ class BehaviorPolicy:
         bias = weight_map.get("bias", 0.0)
         self._model.set_linear_mapping(features, bias)
 
-    def _parse_training_data(self, training_data: Iterable) -> Iterable[TrainingExample]:
+    def _parse_training_data(self, training_data: Iterable[Any]) -> Iterable[TrainingExample]:
         for item in training_data:
             if isinstance(item, tuple) and len(item) == 2:
                 inputs, target = item
@@ -199,11 +202,11 @@ class BehaviorPolicy:
                     inputs = BehaviorInputs(**inputs_payload)
                     yield inputs, _clamp(float(item["score"]))
 
-    def train(self, dataset: Sequence[TrainingExample], epochs: int = 150) -> List[float]:
+    def train(self, dataset: Sequence[TrainingExample], epochs: int = 150) -> list[float]:
         if not dataset:
             return []
         data = list(dataset)
-        history: List[float] = []
+        history: list[float] = []
         for _ in range(max(1, epochs)):
             self._rng.shuffle(data)
             total_loss = 0.0

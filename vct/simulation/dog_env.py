@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import random
-from typing import Any, Dict, List, Sequence, TYPE_CHECKING
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - only for type checking
     from ..robodog.dog_bot_brain import RoboDogBrain
@@ -22,7 +23,7 @@ class EnvState:
     mood: float = 0.0  # -1 .. 1
     reward_history: float = 0.5
 
-    def as_dict(self) -> Dict[str, float]:
+    def as_dict(self) -> dict[str, float]:
         return {
             "fatigue": self.fatigue,
             "mood": self.mood,
@@ -40,13 +41,13 @@ class DogEnv:
     # ------------------------------------------------------------------
     # Environment dynamics helpers
     # ------------------------------------------------------------------
-    def reset(self) -> Dict[str, float]:
+    def reset(self) -> dict[str, float]:
         """Reset the environment to a neutral internal state."""
 
         self.s = EnvState()
         return self.observe()
 
-    def observe(self) -> Dict[str, float]:
+    def observe(self) -> dict[str, float]:
         """Return a shallow copy of the current state."""
 
         return dict(self.s.as_dict())
@@ -54,7 +55,7 @@ class DogEnv:
     # ------------------------------------------------------------------
     # Simulation logic
     # ------------------------------------------------------------------
-    def step(self, action: str, score: float) -> Dict[str, Any]:
+    def step(self, action: str, score: float) -> dict[str, Any]:
         """Advance the environment after the brain selects an action."""
 
         fatigue_penalty = 0.25 * self.s.fatigue
@@ -83,12 +84,12 @@ class DogEnv:
 
     def run_brain_step(
         self,
-        brain: "RoboDogBrain",
+        brain: RoboDogBrain,
         command: str,
         *,
         confidence: float = 0.85,
         reward_bias: float = 0.5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a closed-loop interaction between the environment and brain.
 
         The current environment state is forwarded to the brain so that it can
@@ -110,15 +111,15 @@ class DogEnv:
 
     def simulate_commands(
         self,
-        brain: "RoboDogBrain",
+        brain: RoboDogBrain,
         commands: Sequence[str],
         *,
         confidence: float = 0.85,
         reward_bias: float = 0.5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run a batch of commands through the closed-loop simulator."""
 
-        history: List[Dict[str, Any]] = []
+        history: list[dict[str, Any]] = []
         successes = 0
         for text in commands:
             outcome = self.run_brain_step(

@@ -1,16 +1,18 @@
 """A tiny YAML loader sufficient for the project's configuration fixtures."""
+
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
 
-__all__ = ["safe_load"]
+__all__ = ["safe_load", "safe_dump"]
 
 
 @dataclass
 class _StackFrame:
     indent: int
-    container: Dict[str, Any]
+    container: dict[str, Any]
 
 
 def _parse_scalar(token: str) -> Any:
@@ -31,8 +33,8 @@ def _parse_scalar(token: str) -> Any:
         inner = token[1:-1].strip()
         if not inner:
             return {}
-        result: Dict[str, Any] = {}
-        parts: List[str] = []
+        result: dict[str, Any] = {}
+        parts: list[str] = []
         depth = 0
         start = 0
         for idx, char in enumerate(inner):
@@ -50,14 +52,14 @@ def _parse_scalar(token: str) -> Any:
             key, value = part.split(":", 1)
             result[key.strip()] = _parse_scalar(value.strip())
         return result
-    if (token.startswith("\"") and token.endswith("\"")) or (
+    if (token.startswith('"') and token.endswith('"')) or (
         token.startswith("'") and token.endswith("'")
     ):
         return token[1:-1]
     return token
 
 
-def safe_load(stream: Any) -> Dict[str, Any]:
+def safe_load(stream: Any) -> dict[str, Any]:
     if hasattr(stream, "read"):
         text = stream.read()
     else:
@@ -67,8 +69,8 @@ def safe_load(stream: Any) -> Dict[str, Any]:
     if not isinstance(text, str):
         raise TypeError("safe_load() expects a string or a text IO object")
 
-    root: Dict[str, Any] = {}
-    stack: List[_StackFrame] = [_StackFrame(indent=-1, container=root)]
+    root: dict[str, Any] = {}
+    stack: list[_StackFrame] = [_StackFrame(indent=-1, container=root)]
 
     for raw_line in text.splitlines():
         line = raw_line.split("#", 1)[0].rstrip()
@@ -81,7 +83,7 @@ def safe_load(stream: Any) -> Dict[str, Any]:
         current = stack[-1].container
         if stripped.endswith(":"):
             key = stripped[:-1].strip()
-            new_map: Dict[str, Any] = {}
+            new_map: dict[str, Any] = {}
             current[key] = new_map
             stack.append(_StackFrame(indent=indent, container=new_map))
             continue
@@ -91,3 +93,14 @@ def safe_load(stream: Any) -> Dict[str, Any]:
         current[key.strip()] = _parse_scalar(value.strip())
 
     return root
+
+
+def safe_dump(data: dict[str, Any], *, allow_unicode: bool = True, sort_keys: bool = True) -> str:
+    """Serialize a mapping to a YAML-like string."""
+
+    return json.dumps(
+        data,
+        ensure_ascii=not allow_unicode,
+        sort_keys=sort_keys,
+        indent=2,
+    )

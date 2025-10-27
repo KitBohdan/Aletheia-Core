@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import importlib
 import logging
 import os
+import tempfile
 from contextlib import suppress
 from pathlib import Path
-from typing import Optional
+from types import ModuleType
+from typing import Any, cast
 
 log = logging.getLogger(__name__)
 
@@ -12,14 +15,14 @@ log = logging.getLogger(__name__)
 class TTSEngineBase:
     """Base contract for TTS engines."""
 
-    def speak(self, text: str, *, voice: Optional[str] = None, language: Optional[str] = None) -> None:
+    def speak(self, text: str, *, voice: str | None = None, language: str | None = None) -> None:
         raise NotImplementedError
 
 
 class PrintTTS(TTSEngineBase):
     """Simple TTS that prints the phrase to stdout."""
 
-    def speak(self, text: str, *, voice: Optional[str] = None, language: Optional[str] = None) -> None:
+    def speak(self, text: str, *, voice: str | None = None, language: str | None = None) -> None:
         label = voice or "TTS"
         print(f"[{label}] {text}")
 
@@ -27,11 +30,11 @@ class PrintTTS(TTSEngineBase):
 class Pyttsx3TTS(TTSEngineBase):
     """Offline TTS using pyttsx3 with optional voice selection."""
 
-    def __init__(self, voice: Optional[str] = None):
+    def __init__(self, voice: str | None = None):
         self.voice = voice
         self._fallback = PrintTTS()
         try:
-            import pyttsx3  # type: ignore
+            import pyttsx3
 
             self.engine = pyttsx3.init()
             if voice:
@@ -41,7 +44,7 @@ class Pyttsx3TTS(TTSEngineBase):
             log.warning("pyttsx3 unavailable (%s), falling back to console output", exc)
             self.engine = None
 
-    def speak(self, text: str, *, voice: Optional[str] = None, language: Optional[str] = None) -> None:
+    def speak(self, text: str, *, voice: str | None = None, language: str | None = None) -> None:
         if self.engine is None:
             self._fallback.speak(text, voice=voice)
             return
@@ -59,10 +62,10 @@ class OpenAITTS(TTSEngineBase):
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        voice: Optional[str] = None,
-        model: Optional[str] = None,
-        language: Optional[str] = None,
+        api_key: str | None = None,
+        voice: str | None = None,
+        model: str | None = None,
+        language: str | None = None,
         playback: bool = True,
     ) -> None:
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
@@ -71,19 +74,21 @@ class OpenAITTS(TTSEngineBase):
         self.language = language or os.getenv("OPENAI_TTS_LANGUAGE")
         self.playback = playback
         self._fallback = PrintTTS()
+        self._session: Any | None = None
         try:  # pragma: no cover - executed in runtime environments with network access
-            import requests  # type: ignore
+            requests = importlib.import_module("requests")
 
-            self._session = requests.Session()
+            self._session = cast(Any, requests).Session()
         except Exception as exc:
-            log.warning("Requests library unavailable (%s); TTS will fall back to console output", exc)
-            self._session = None
-        self._player = self._load_player()
+            log.warning(
+                "Requests library unavailable (%s); TTS will fall back to console output", exc
+            )
+        self._player: ModuleType | None = self._load_player()
 
     @staticmethod
-    def _load_player():
+    def _load_player() -> ModuleType | None:
         try:  # pragma: no cover - audio playback is best-effort
-            import simpleaudio  # type: ignore
+            import simpleaudio
 
             return simpleaudio
         except Exception:
@@ -96,13 +101,13 @@ class OpenAITTS(TTSEngineBase):
         if not os.getenv("OPENAI_API_KEY"):
             return False
         try:
-            import requests  # type: ignore # noqa: F401
+            import importlib.util
 
-            return True
+            return importlib.util.find_spec("requests") is not None
         except Exception:
             return False
 
-    def speak(self, text: str, *, voice: Optional[str] = None, language: Optional[str] = None) -> None:
+    def speak(self, text: str, *, voice: str | None = None, language: str | None = None) -> None:
         if not text:
             return
         if not self.api_key or self._session is None:
@@ -155,7 +160,7 @@ class OpenAITTS(TTSEngineBase):
 
     @staticmethod
     def _persist_audio(audio_bytes: bytes) -> Path:
-        fd, path = os.mkstemp(prefix="vct-openai-", suffix=".wav")
+        fd, path = tempfile.mkstemp(prefix="vct-openai-", suffix=".wav")
         with os.fdopen(fd, "wb") as fh:
             fh.write(audio_bytes)
         return Path(path)

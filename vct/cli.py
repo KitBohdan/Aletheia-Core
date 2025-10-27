@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from typing import Sequence
+from collections.abc import Sequence
 
 from .configuration import RoboDogSettings, apply_key_path, parse_typed_value
 from .robodog.dog_bot_brain import RoboDogBrain
@@ -62,7 +62,9 @@ def main() -> None:
     show_parser.set_defaults(func=_handle_config_show)
 
     set_parser = config_sub.add_parser("set", help="Update a configuration value")
-    set_parser.add_argument("key", help="Dot separated key path to update (e.g. commands_map.сидіти)")
+    set_parser.add_argument(
+        "key", help="Dot separated key path to update (e.g. commands_map.сидіти)"
+    )
     set_parser.add_argument("value", help="New value for the key")
     set_parser.add_argument(
         "--type",
