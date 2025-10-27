@@ -1,13 +1,12 @@
 import time
 from typing import Dict, Optional
 
-import yaml
-
 from ..behavior.policy import BehaviorInputs, BehaviorPolicy
 from ..engines.stt import RuleBasedSTT, WhisperSTT
 from ..engines.tts import OpenAITTS, Pyttsx3TTS, PrintTTS
 from ..ethics.guard import EthicsGuard
 from ..hardware.gpio_reward import GPIOActuator, SimulatedActuator
+from ..configuration import RoboDogSettings
 from ..utils.logging import get_logger
 
 log = get_logger("RoboDogBrain")
@@ -19,8 +18,8 @@ def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
 
 class RoboDogBrain:
     def __init__(self, cfg_path: str, gpio_pin: Optional[int] = None, simulate: bool = False):
-        with open(cfg_path, "r", encoding="utf-8") as f:
-            self.cfg = yaml.safe_load(f)
+        self.settings = RoboDogSettings.load(cfg_path)
+        self.cfg = self.settings.model_dump()
         try:
             self.stt = WhisperSTT()
         except RuntimeError as exc:
@@ -32,22 +31,17 @@ class RoboDogBrain:
             self.tts = OpenAITTS()
         else:
             self.tts = Pyttsx3TTS()
-        policy_cfg = (
-            self.cfg.get("behavior_policy")
-            or self.cfg.get("policy")
-            or self.cfg.get("weights", {})
-        )
-        self.policy = BehaviorPolicy(policy_cfg)
-        self.environment_context: Dict[str, float] = self.cfg.get("environment_context", {})
-        self.reward_map: Dict[str, bool] = self.cfg.get("reward_triggers", {})
-        self.cooldown_s = float(self.cfg.get("reward_cooldown_s", 3))
+        self.policy = BehaviorPolicy(self.settings.policy_config)
+        self.environment_context: Dict[str, float] = self.settings.environment_context
+        self.reward_map: Dict[str, bool] = self.settings.reward_triggers
+        self.cooldown_s = float(self.settings.reward_cooldown_s)
         self.simulate = simulate
         self.actuator = SimulatedActuator() if (simulate or gpio_pin is None) else GPIOActuator(gpio_pin)
         self.guard = EthicsGuard()
         self._last_reward_ts = 0.0
 
     def _action_from_text(self, text: str) -> str:
-        m = self.cfg.get("commands_map", {})
+        m = self.settings.commands_map
         n = text.strip().lower().replace(" ", "")
         for k, v in m.items():
             if k.replace(" ", "") in n:
