@@ -32,5 +32,14 @@ jobs:
       - name: Run MyPy
         run: mypy vct
 
-      - name: Run tests
-        run: pytest -q
+      - name: Run tests with coverage
+        run: |
+          coverage run -m pytest
+          coverage report
+          coverage xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
