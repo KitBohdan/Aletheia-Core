@@ -6,7 +6,7 @@ from typing import Any, Dict, Iterable, Mapping, MutableMapping, Tuple
 import json
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 
 class RoboDogSettings(BaseModel):
@@ -39,10 +39,12 @@ class RoboDogSettings(BaseModel):
         if isinstance(value, dict):
             normalized = {}
             for k, v in value.items():
-                key = str(k).strip()
-                if not key:
+                raw_key = str(k)
+                key = raw_key.strip()
+                cleaned = key.strip("'\"")
+                if not cleaned:
                     raise ValueError("Command map keys must be non-empty strings")
-                normalized[key.lower()] = str(v).strip().upper() or "NONE"
+                normalized[cleaned.lower()] = str(v).strip().upper() or "NONE"
             return normalized
         raise TypeError("commands_map must be a mapping of phrase to action")
 
@@ -79,7 +81,10 @@ class RoboDogSettings(BaseModel):
     @classmethod
     def load(cls, path: str | Path) -> "RoboDogSettings":
         payload = _read_config(path)
-        return cls.model_validate(payload)
+        try:
+            return cls.model_validate(payload)
+        except ValidationError as exc:
+            raise ValueError(str(exc)) from exc
 
     def save(self, path: str | Path) -> None:
         _write_config(path, self.model_dump(mode="json"))
