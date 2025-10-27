@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import sys
+from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -79,6 +80,34 @@ class CorrelationIdFilter(logging.Filter):
 class StructuredJsonFormatter(logging.Formatter):
     """Format log records as structured JSON strings."""
 
+    @staticmethod
+    def _json_safe(value: Any) -> Any:
+        """Return a JSON-serializable representation of ``value``."""
+
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+
+        if isinstance(value, datetime):
+            # ``datetime`` is commonly attached to extras and should emit ISO strings.
+            return value.astimezone(timezone.utc).isoformat()
+
+        if isinstance(value, Path):
+            return str(value)
+
+        if isinstance(value, Mapping):
+            return {str(key): StructuredJsonFormatter._json_safe(item) for key, item in value.items()}
+
+        if isinstance(value, set):
+            return [StructuredJsonFormatter._json_safe(item) for item in value]
+
+        if isinstance(value, (bytes, bytearray)):
+            return value.decode(errors="replace")
+
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            return [StructuredJsonFormatter._json_safe(item) for item in value]
+
+        return str(value)
+
     def format(self, record: logging.LogRecord) -> str:
         payload: Dict[str, Any] = {
             "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
@@ -97,7 +126,10 @@ class StructuredJsonFormatter(logging.Formatter):
             if key not in _RESERVED_RECORD_FIELDS and not key.startswith("_")
         }
         if extra:
-            payload["extra"] = extra
+            payload["extra"] = {
+                key: StructuredJsonFormatter._json_safe(value)
+                for key, value in extra.items()
+            }
 
         return json.dumps(payload, ensure_ascii=False, default=str)
 

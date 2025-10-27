@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 
 import pytest
@@ -92,13 +93,25 @@ def test_structured_formatter_handles_non_json_serializable_extra(
     logger = get_logger("vct.test.non_serializable")
 
     with caplog.at_level(logging.INFO):
-        logger.info("with extra", extra={"request": NonSerializable()})
+        logger.info(
+            "with extra",
+            extra={
+                "request": NonSerializable(),
+                "timestamp": datetime(2023, 7, 18, 12, 0, 0, tzinfo=timezone.utc),
+                "payload": {"ids": {1, 2}},
+                "raw": b"binary",
+            },
+        )
 
     assert caplog.records
     formatter = StructuredJsonFormatter()
     rendered = formatter.format(caplog.records[0])
     parsed = json.loads(rendered)
-    assert parsed["extra"]["request"] == "<NonSerializable>"
+    extra = parsed["extra"]
+    assert extra["request"] == "<NonSerializable>"
+    assert extra["timestamp"] == "2023-07-18T12:00:00+00:00"
+    assert sorted(extra["payload"]["ids"]) == [1, 2]
+    assert extra["raw"] == "binary"
 
 
 def test_get_correlation_id_defaults_to_none() -> None:
