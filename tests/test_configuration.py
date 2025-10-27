@@ -96,7 +96,9 @@ def test_write_config_unsupported_format(tmp_path: Path) -> None:
         _write_config(tmp_path / "config.ini", {"a": 1})
 
 
-def test_write_config_requires_tomli_w_for_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_write_config_requires_tomli_w_for_toml(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     original_import = builtins.__import__
 
     def fake_import(name: str, *args, **kwargs):
