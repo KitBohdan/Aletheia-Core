@@ -12,6 +12,11 @@ from ..utils.logging import get_logger
 
 log = get_logger("RoboDogBrain")
 
+
+def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
+    return max(low, min(high, value))
+
+
 class RoboDogBrain:
     def __init__(self, cfg_path: str, gpio_pin: Optional[int] = None, simulate: bool = False):
         with open(cfg_path, "r", encoding="utf-8") as f:
@@ -27,12 +32,19 @@ class RoboDogBrain:
             self.tts = OpenAITTS()
         else:
             self.tts = Pyttsx3TTS()
-        self.policy = BehaviorPolicy(self.cfg.get("weights", {}))
+        policy_cfg = (
+            self.cfg.get("behavior_policy")
+            or self.cfg.get("policy")
+            or self.cfg.get("weights", {})
+        )
+        self.policy = BehaviorPolicy(policy_cfg)
+        self.environment_context: Dict[str, float] = self.cfg.get("environment_context", {})
         self.reward_map: Dict[str, bool] = self.cfg.get("reward_triggers", {})
         self.cooldown_s = float(self.cfg.get("reward_cooldown_s", 3))
         self.simulate = simulate
         self.actuator = SimulatedActuator() if (simulate or gpio_pin is None) else GPIOActuator(gpio_pin)
         self.guard = EthicsGuard()
+        self._last_reward_ts = 0.0
 
     def _action_from_text(self, text: str) -> str:
         m = self.cfg.get("commands_map", {})
@@ -50,16 +62,38 @@ class RoboDogBrain:
             return False
         self.actuator.trigger(0.4)
         self.guard.note_reward(now)
+        self._last_reward_ts = now
         return True
 
-    def handle_command(self, text: str, confidence: float = 0.85, reward_bias: float = 0.5, mood: float = 0.0) -> Dict:
+    def handle_command(
+        self,
+        text: str,
+        confidence: float = 0.85,
+        reward_bias: float = 0.5,
+        mood: float = 0.0,
+    ) -> Dict:
         action = self._action_from_text(text)
-        inputs = BehaviorInputs(stimulus=1.0 if action != "NONE" else 0.0,
-                                confidence=confidence, reward_bias=reward_bias, mood=mood)
+        now = time.time()
+        time_since_reward = now - self._last_reward_ts if self._last_reward_ts else self.cooldown_s
+        fatigue = _clamp(time_since_reward / max(self.cooldown_s * 2.0, 1.0))
+        stress = _clamp(1.0 - confidence)
+        env_complexity = _clamp(float(self.environment_context.get("complexity", 0.5)))
+        social_engagement = _clamp(float(self.environment_context.get("social_engagement", 0.5)))
+        inputs = BehaviorInputs(
+            stimulus=1.0 if action != "NONE" else 0.0,
+            confidence=confidence,
+            reward_bias=reward_bias,
+            mood=mood,
+            stress=stress,
+            fatigue=fatigue,
+            environmental_complexity=env_complexity,
+            social_engagement=social_engagement,
+        )
         vec = self.policy.decide(action, inputs)
         rewarded = self._maybe_reward(vec.action, vec.score)
         feedback = f"Дія: {vec.action} score={vec.score:.2f}" + (" — ✅ винагорода" if rewarded else "")
-        self.tts.speak(feedback); log.info(feedback)
+        self.tts.speak(feedback)
+        log.info(feedback)
         return {"action": vec.action, "score": vec.score, "rewarded": rewarded}
 
     def run_once_from_wav(self, wav_path: str) -> Dict:
