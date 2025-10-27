@@ -10,6 +10,7 @@ from ..engines.tts import OpenAITTS, PrintTTS, Pyttsx3TTS, TTSEngineBase
 from ..ethics.guard import EthicsGuard
 from ..hardware.gpio_reward import GPIOActuator, RewardActuatorBase, SimulatedActuator
 from ..utils.logging import get_logger
+from ..utils.metrics import record_reward
 
 log = get_logger("RoboDogBrain")
 
@@ -100,6 +101,7 @@ class RoboDogBrain:
         )
         self.tts.speak(feedback)
         log.info(feedback)
+        record_reward(vec.action, rewarded)
         return {"action": vec.action, "score": vec.score, "rewarded": rewarded}
 
     def run_once_from_wav(self, wav_path: str) -> dict[str, Any]:
